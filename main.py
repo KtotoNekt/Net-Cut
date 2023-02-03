@@ -9,7 +9,7 @@ if "SUDO_COMMAND" not in os.environ.keys():
 
 import argparse
 
-parser = argparse.ArgumentParser(prog="Net-Cut", description="С помощью данной консольной утилиты вы можете отключить интернет пользователю, зная его локальный IP адрес")
+parser = argparse.ArgumentParser(prog="net-cut", description="С помощью данной консольной утилиты вы можете отключить интернет пользователю, зная его локальный IP адрес")
 parser.add_argument("ip", metavar='ip', help="IP пользователя, которого нужно отключить от сети")
 parser.add_argument("-w", "--waiting", help="Ждать ли пользователя, после его отключения от сети (по умолчанию: нет)", action='store_true')
 
